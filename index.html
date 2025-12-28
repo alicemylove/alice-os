@@ -2,7 +2,8 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Viewport fit cover para respeitar as áreas seguras do iOS -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=0">
     <title>AliceOS - Terminal de Acesso Privado</title>
     <style>
         :root {
@@ -16,11 +17,15 @@
             color: var(--neon-color);
             font-family: 'Courier New', Courier, monospace;
             margin: 0; padding: 0;
-            height: 100vh; overflow: hidden;
-            display: flex; flex-direction: column;
+            /* svh é a melhor unidade para lidar com a barra do iPhone */
+            height: 100svh; 
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
         }
 
-        /* Efeito de Scanline (linhas de TV antiga) */
+        /* Efeito de Scanline */
         body::before {
             content: " ";
             display: block; position: absolute; top: 0; left: 0; bottom: 0; right: 0;
@@ -31,10 +36,12 @@
 
         #header {
             padding: 10px 20px;
+            padding-top: calc(10px + env(safe-area-inset-top));
             border-bottom: 1px solid var(--neon-color);
             font-size: 12px;
             display: flex; justify-content: space-between;
             background: rgba(0, 255, 65, 0.1);
+            flex-shrink: 0;
         }
 
         #terminal {
@@ -43,61 +50,54 @@
             flex-grow: 1;
             font-size: 15px;
             text-shadow: 0 0 5px var(--neon-color);
+            -webkit-overflow-scrolling: touch;
         }
+
+        #quick-menu {
+            padding: 10px;
+            display: flex; gap: 10px; flex-wrap: wrap;
+            justify-content: center; background: #000;
+            border-top: 1px solid #222;
+            flex-shrink: 0;
+        }
+
+        .btn-cmd {
+            background: transparent; border: 1px solid var(--neon-color);
+            color: var(--neon-color); padding: 8px 12px; cursor: pointer;
+            font-family: inherit; font-size: 11px; transition: 0.3s;
+            text-transform: uppercase;
+        }
+
+        .btn-cmd:hover { background: var(--neon-color); color: #000; }
 
         #input-area {
             display: flex; align-items: center;
-            padding: 15px 20px;
+            /* Aumentado o padding para o iPhone não cobrir com a barra de pesquisa */
+            padding: 15px 20px 30px 20px;
+            padding-bottom: calc(30px + env(safe-area-inset-bottom));
             background: #000;
             border-top: 1px solid var(--neon-color);
+            flex-shrink: 0;
         }
 
         #prompt { color: var(--highlight); margin-right: 10px; font-weight: bold; }
 
         input {
             background: transparent; border: none; color: var(--neon-color);
-            font-family: inherit; font-size: 16px; outline: none; width: 100%;
+            font-family: inherit; 
+            font-size: 16px !important; /* Impede o zoom do iOS */
+            outline: none; width: 100%;
         }
 
-        /* Menu Interativo de Botões */
-        #quick-menu {
-            padding: 10px;
-            display: flex; gap: 10px; flex-wrap: wrap;
-            justify-content: center; background: #000;
-        }
-
-        .btn-cmd {
-            background: transparent; border: 1px solid var(--neon-color);
-            color: var(--neon-color); padding: 5px 15px; cursor: pointer;
-            font-family: inherit; font-size: 12px; transition: 0.3s;
-        }
-
-        .btn-cmd:hover { background: var(--neon-color); color: #000; }
-
-        /* Estilo das Molduras e Cartinha */
         .photo-frame, .letter-frame {
             border: 1px solid var(--neon-color);
-            padding: 15px;
-            background: rgba(0, 255, 65, 0.05);
-            margin: 15px 0;
-            max-width: 90%;
-            display: inline-block;
+            padding: 15px; background: rgba(0, 255, 65, 0.05);
+            margin: 15px 0; max-width: 90%; display: inline-block;
             line-height: 1.6;
         }
 
-        .letter-frame {
-            border-color: var(--highlight);
-            color: #fff;
-            text-shadow: none;
-            white-space: pre-wrap; 
-        }
-
-        .photo-frame img {
-            width: 100%; height: auto;
-            filter: grayscale(0.2) contrast(1.1);
-            border: 1px solid var(--highlight);
-        }
-
+        .letter-frame { border-color: var(--highlight); color: #fff; text-shadow: none; white-space: pre-wrap; }
+        .photo-frame img { width: 100%; height: auto; border: 1px solid var(--highlight); }
         .photo-caption { font-size: 11px; color: var(--highlight); margin-top: 5px; text-align: center; }
         .ascii-art { font-size: 8px; line-height: 8px; white-space: pre; margin: 15px 0; color: var(--highlight); }
         .spotify-container { margin: 20px 0; border: 1px solid var(--highlight); border-radius: 12px; overflow: hidden; max-width: 300px;}
@@ -276,6 +276,14 @@ Vitor Arruda ❤️
             }
         });
 
+        // Garante que o terminal role para baixo ao focar no input (abrir teclado)
+        input.addEventListener('focus', () => {
+            setTimeout(() => {
+                history.scrollTop = history.scrollHeight;
+                window.scrollTo(0, 0);
+            }, 300);
+        });
+
         async function executeCommand(cmd) {
             const p = document.createElement('div');
             p.innerHTML = `<span style="color:var(--highlight)">alice@love:~$</span> ${cmd}`;
@@ -286,7 +294,6 @@ Vitor Arruda ❤️
                 return;
             }
 
-            // Confete somente para os comandos selecionados (Cartinha removida!)
             if (cmd === 'te quero' || cmd === 'recompensa') {
                 heartConfetti();
             }
@@ -297,10 +304,12 @@ Vitor Arruda ❤️
 
             const response = config.commands[cmd] || "Comando inválido. Tente 'ajuda' ou o menu.";
             await printOutput(response);
+            
+            setTimeout(() => { history.scrollTop = history.scrollHeight; }, 100);
         }
 
         function spawnKisses() {
-            for (let i = 0; i < 50; i++) {
+            for (let i = 0; i < 40; i++) {
                 const kiss = document.createElement('div');
                 kiss.className = 'kiss-particle';
                 kiss.innerHTML = '💋';
@@ -313,29 +322,25 @@ Vitor Arruda ❤️
         }
 
         function heartConfetti() {
-            const duration = 3 * 1000;
+            const duration = 3000;
             const end = Date.now() + duration;
             (function frame() {
-                confetti({
-                    particleCount: 3,
-                    angle: 60,
-                    spread: 55,
-                    origin: { x: 0 },
-                    colors: ['#ff69b4', '#00ff41']
-                });
-                confetti({
-                    particleCount: 3,
-                    angle: 120,
-                    spread: 55,
-                    origin: { x: 1 },
-                    colors: ['#ff69b4', '#00ff41']
-                });
+                confetti({ particleCount: 3, angle: 60, spread: 55, origin: { x: 0 }, colors: ['#ff69b4', '#00ff41'] });
+                confetti({ particleCount: 3, angle: 120, spread: 55, origin: { x: 1 }, colors: ['#ff69b4', '#00ff41'] });
                 if (Date.now() < end) requestAnimationFrame(frame);
             }());
         }
 
-        window.onload = () => typeLines(config.intro);
-        document.body.addEventListener('click', () => input.focus());
+        window.onload = () => {
+            typeLines(config.intro);
+            updateClock();
+        };
+
+        document.body.addEventListener('click', (e) => {
+            if (e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT') {
+                input.focus();
+            }
+        });
     </script>
 </body>
 </html>
