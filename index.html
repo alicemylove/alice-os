@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AliceOS - Terminal de Acesso Privado</title>
+    <style>
+        :root {
+            --neon-color: #00ff41; /* Verde clássico */
+            --highlight: #ff69b4; /* Rosa para dar o toque romântico */
+            --bg-dark: #050505;
+        }
+
+        body, html {
+            background-color: var(--bg-dark);
+            color: var(--neon-color);
+            font-family: 'Courier New', Courier, monospace;
+            margin: 0; padding: 0;
+            height: 100vh; overflow: hidden;
+            display: flex; flex-direction: column;
+        }
+
+        /* Efeito de Scanline (linhas de TV antiga) */
+        body::before {
+            content: " ";
+            display: block; position: absolute; top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
+                        linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 255, 0, 0.06));
+            z-index: 10; background-size: 100% 2px, 3px 100%; pointer-events: none;
+        }
+
+        #header {
+            padding: 10px 20px;
+            border-bottom: 1px solid var(--neon-color);
+            font-size: 12px;
+            display: flex; justify-content: space-between;
+            background: rgba(0, 255, 65, 0.1);
+        }
+
+        #terminal {
+            padding: 20px;
+            overflow-y: auto;
+            flex-grow: 1;
+            font-size: 15px;
+            text-shadow: 0 0 5px var(--neon-color);
+        }
+
+        #input-area {
+            display: flex; align-items: center;
+            padding: 15px 20px;
+            background: #000;
+            border-top: 1px solid var(--neon-color);
+        }
+
+        #prompt { color: var(--highlight); margin-right: 10px; font-weight: bold; }
+
+        input {
+            background: transparent; border: none; color: var(--neon-color);
+            font-family: inherit; font-size: 16px; outline: none; width: 100%;
+        }
+
+        /* Menu Interativo de Botões */
+        #quick-menu {
+            padding: 10px;
+            display: flex; gap: 10px; flex-wrap: wrap;
+            justify-content: center; background: #000;
+        }
+
+        .btn-cmd {
+            background: transparent; border: 1px solid var(--neon-color);
+            color: var(--neon-color); padding: 5px 15px; cursor: pointer;
+            font-family: inherit; font-size: 12px; transition: 0.3s;
+        }
+
+        .btn-cmd:hover { background: var(--neon-color); color: #000; }
+
+        /* Estilo das Molduras e Cartinha */
+        .photo-frame, .letter-frame {
+            border: 1px solid var(--neon-color);
+            padding: 15px;
+            background: rgba(0, 255, 65, 0.05);
+            margin: 15px 0;
+            max-width: 90%;
+            display: inline-block;
+            line-height: 1.6;
+        }
+
+        .letter-frame {
+            border-color: var(--highlight);
+            color: #fff;
+            text-shadow: none;
+            white-space: pre-wrap; 
+        }
+
+        .photo-frame img {
+            width: 100%; height: auto;
+            filter: grayscale(0.2) contrast(1.1);
+            border: 1px solid var(--highlight);
+        }
+
+        .photo-caption { font-size: 11px; color: var(--highlight); margin-top: 5px; text-align: center; }
+        .ascii-art { font-size: 8px; line-height: 8px; white-space: pre; margin: 15px 0; color: var(--highlight); }
+        .spotify-container { margin: 20px 0; border: 1px solid var(--highlight); border-radius: 12px; overflow: hidden; max-width: 300px;}
+        .system-alert { color: var(--highlight); animation: blink 0.8s infinite; }
+        @keyframes blink { 50% { opacity: 0; } }
+
+        .kiss-particle {
+            position: fixed; bottom: -50px; font-size: 24px; z-index: 100;
+            pointer-events: none; animation: floatUp 3s ease-in-out forwards;
+        }
+        @keyframes floatUp {
+            0% { transform: translateY(0) rotate(0deg); opacity: 0; }
+            20% { opacity: 1; }
+            100% { transform: translateY(-110vh) rotate(45deg); opacity: 0; }
+        }
+
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-thumb { background: var(--neon-color); }
+    </style>
+</head>
+<body>
+
+    <div id="header">
+        <span>STATUS: CONECTADO</span>
+        <span>USER: ALICE_FAVORITE</span>
+        <span id="clock"></span>
+    </div>
+
+    <div id="terminal">
+        <div id="history"></div>
+    </div>
+
+    <div id="quick-menu">
+        <button class="btn-cmd" onclick="runBtn('sobre')">SOBRE</button>
+        <button class="btn-cmd" onclick="runBtn('fotos')">FOTOS</button>
+        <button class="btn-cmd" onclick="runBtn('cartinha')">CARTINHA</button>
+        <button class="btn-cmd" onclick="runBtn('data')">NOSSA DATA</button>
+        <button class="btn-cmd" onclick="runBtn('segredo')">O SEGREDO</button>
+        <button class="btn-cmd" onclick="runBtn('recompensa')">RECOMPENSA</button>
+        <button class="btn-cmd" onclick="runBtn('te quero')">TE QUERO</button>
+        <button class="btn-cmd" onclick="runBtn('limpar')">LIMPAR</button>
+    </div>
+
+    <div id="input-area">
+        <span id="prompt">alice@love:~$</span>
+        <input type="text" id="user-input" autofocus autocomplete="off" placeholder="digite algo...">
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+
+    <script>
+        const history = document.getElementById('history');
+        const input = document.getElementById('user-input');
+
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('clock').innerText = now.toLocaleTimeString();
+        }
+        setInterval(updateClock, 1000);
+
+        const heartAscii = `
+          ******       ******
+        **      **   **      **
+       **         ** **         **
+       **           *           **
+        **                     **
+         **                   **
+           **               **
+             **           **
+               **       **
+                 **   **
+                   ***
+        `;
+
+        const config = {
+            intro: [
+                "Iniciando AliceOS v1.0...",
+                "Autenticando usuária altamente especial...",
+                "Acesso garantido. Bem-vinda, Alice! ❤️",
+                "------------------------------------------",
+                "Use o menu abaixo ou digite 'ajuda'."
+            ],
+            commands: {
+                'ajuda': "Comandos: 'sobre', 'fotos', 'cartinha', 'data', 'segredo', 'recompensa', 'limpar', 'te quero'",
+                'sobre': "Este é um espaço seguro criado apenas para você. Um terminal onde cada linha de código carrega um pouco do que sinto.",
+                'data': "O relógio do sistema indica que cada segundo ao seu lado é o melhor investimento de tempo possível.",
+                'limpar': "",
+                'fotos': `
+                    <div class='system-alert'>RECUPERANDO ARQUIVOS DE MEMÓRIA...</div>
+                    <div class="photo-frame">
+                        <img src="img/alice_pc.jpeg" alt="Alice no computador">
+                        <div class="photo-caption">> arquivo: mulher_estudiosa.jpg</div>
+                    </div>
+                    <div class="photo-frame">
+                        <img src="img/nos_1.jpeg" alt="Nós juntos">
+                        <div class="photo-caption">> arquivo: momento_perfeito.jpg</div>
+                    </div>
+                    <div class="photo-frame">
+                        <img src="img/nos_2.jpeg" alt="Nós juntos 2">
+                        <div class="photo-caption">> arquivo: para_sempre.jpg</div>
+                    </div>
+                `,
+                'segredo': `
+                    <div class='system-alert'>INICIANDO PROTOCOLO: NOSSA MÚSICA...</div>
+                    <div class='spotify-container'>
+                        <iframe style="border-radius:12px" src="https://open.spotify.com/embed/track/5eEfFfQq3ruywWA5uw7nhj?utm_source=generator&theme=0" width="100%" height="152" frameBorder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>
+                    </div>
+                    Essa música é você em forma de som. ❤️
+                `,
+                'cartinha': `
+                    <div class='system-alert'>ABRINDO ARQUIVO: PARA_ALICE.txt</div>
+                    <div class="letter-frame">
+Minha namorada,
+
+Olhar para você é como se meu mundo parasse, como nas cenas de paixão dos filmes sabe...
+Amor meu grande amor, estou muito feliz em te reencontrar e poder somar contigo,
+um 'bom dia amoreco' que recebo seu muda completamente a minha manhã! :)
+Que possamos construir e solidificar esse sentimento cada vez mais. 
+Criei isso aqui porque eu to com saudade, beijinho e cheirinho. 
+
+Com amor,
+Vitor Arruda ❤️
+                    </div>
+                `,
+                'te quero': "O sistema detectou uma verdade absoluta. <br><div class='ascii-art'>" + heartAscii + "</div>",
+                'recompensa': `
+                    <div class='system-alert'>🎁 RECOMPENSA DESBLOQUEADA!</div>
+                    <div class="photo-frame" style="border-color: var(--highlight);">
+                        <div style="padding: 10px; text-align: center;">
+                            <span style="color: var(--highlight); font-weight: bold;">VALE-PRESENTE ESPECIAL</span><br><br>
+                            Este cupom dá direito a:<br>
+                            [ UM JANTAR ROMÂNTICO ]<br>
+                            <span style="font-size: 10px;">Válido para: O resto de nossas vidas.</span>
+                        </div>
+                    </div>
+                `,
+                'beijo': "💋 Enviando um beijo virtual em 3... 2... 1... <br> Recebido com sucesso no coração da Alice!",
+                'casar': "💍 Analisando compatibilidade do futuro... <br> Resultado: O sistema prevê 100% de felicidade compartilhada.",
+                'futuro': "🚀 Carregando planos... <br> Viagens, risadas, conquistas e nós dois sempre juntos."
+            }
+        };
+
+        async function typeLines(lines) {
+            for (let line of lines) {
+                await printOutput(line);
+            }
+        }
+
+        async function printOutput(text) {
+            const out = document.createElement('div');
+            out.className = 'command-output';
+            history.appendChild(out);
+            
+            if (text.includes('<')) {
+                out.innerHTML = text; 
+            } else {
+                for (let char of text) {
+                    out.innerHTML += char;
+                    await new Promise(r => setTimeout(r, 15));
+                }
+            }
+            history.scrollTop = history.scrollHeight;
+        }
+
+        function runBtn(cmd) {
+            input.value = cmd;
+            executeCommand(cmd);
+            input.value = '';
+        }
+
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                const cmd = input.value.toLowerCase().trim();
+                executeCommand(cmd);
+                input.value = '';
+            }
+        });
+
+        async function executeCommand(cmd) {
+            const p = document.createElement('div');
+            p.innerHTML = `<span style="color:var(--highlight)">alice@love:~$</span> ${cmd}`;
+            history.appendChild(p);
+
+            if (cmd === 'limpar') {
+                history.innerHTML = '';
+                return;
+            }
+
+            // Confete somente para os comandos selecionados (Cartinha removida!)
+            if (cmd === 'te quero' || cmd === 'recompensa') {
+                heartConfetti();
+            }
+
+            if (cmd === 'beijo') {
+                spawnKisses();
+            }
+
+            const response = config.commands[cmd] || "Comando inválido. Tente 'ajuda' ou o menu.";
+            await printOutput(response);
+        }
+
+        function spawnKisses() {
+            for (let i = 0; i < 50; i++) {
+                const kiss = document.createElement('div');
+                kiss.className = 'kiss-particle';
+                kiss.innerHTML = '💋';
+                kiss.style.left = Math.random() * 100 + 'vw';
+                kiss.style.animationDelay = Math.random() * 1 + 's';
+                kiss.style.fontSize = (Math.random() * 20 + 20) + 'px';
+                document.body.appendChild(kiss);
+                setTimeout(() => kiss.remove(), 4000);
+            }
+        }
+
+        function heartConfetti() {
+            const duration = 3 * 1000;
+            const end = Date.now() + duration;
+            (function frame() {
+                confetti({
+                    particleCount: 3,
+                    angle: 60,
+                    spread: 55,
+                    origin: { x: 0 },
+                    colors: ['#ff69b4', '#00ff41']
+                });
+                confetti({
+                    particleCount: 3,
+                    angle: 120,
+                    spread: 55,
+                    origin: { x: 1 },
+                    colors: ['#ff69b4', '#00ff41']
+                });
+                if (Date.now() < end) requestAnimationFrame(frame);
+            }());
+        }
+
+        window.onload = () => typeLines(config.intro);
+        document.body.addEventListener('click', () => input.focus());
+    </script>
+</body>
+</html>
